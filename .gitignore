@@ -17,6 +17,9 @@ venv/
 .DS_Store
 .vscode/
 
+# Keep Task 2 under wraps for now
+chatbot/
+
 # Logs
 *.log
 
@@ -26,7 +29,11 @@ data/financial_data_raw.csv
 
 # Generated analysis outputs / artifacts (reproducible)
 data/analysis/
+
+# Generated images (ignore all, but keep Dashboard 2 for README)
 data/*.png
+data/dashboard_1_growth_profitability.png
+!data/dashboard_2_health_benchmark.png
 
 # Pipeline run artifacts
 pipeline_run.log

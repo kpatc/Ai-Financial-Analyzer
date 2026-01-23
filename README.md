@@ -1,57 +1,49 @@
-# AI Financial Analyzer - Chatbot pour Analyse de Documents 10-K et 10-Q
+# AI Financial Analyzer (BCG GenAI Job Simulation – Forage)
 
-## Vue d'ensemble du projet
+This repo contains my work for the **BCG GenAI Job Simulation on Forage**, where I act as a junior data scientist in BCG’s GenAI consulting team.
 
-Développement d'un chatbot alimenté par l'IA capable d'analyser et de fournir des insights approfondis sur la performance financière des entreprises à partir de documents 10-K et 10-Q.
+**Task 1** focuses on extracting key financial data from **10-K / 10-Q** filings, computing meaningful metrics, and producing clear, comparable outputs.
 
-## Objectifs du projet
+## What Task 1 delivers
 
-- **Efficacité** : Réduire significativement le temps d'analyse des documents financiers
-- **Précision** : Fournir des insights financiers fiables et précis
-- **Interface utilisateur** : Créer une interface intuitive et conviviale
-- **Scalabilité** : Gérer un nombre croissant de documents et de requêtes
+- Automated extraction of key financial line items (income statement / balance sheet / cash flow)
+- Cleaning + standardization across companies/years (including robust YoY handling)
+- Financial metrics for growth, profitability, liquidity, leverage, and returns
+- Dashboards and BI-ready exports for fast interpretation and benchmarking
 
-## Structure du projet
+## Repo structure (high-level)
 
 ```
-├── data/                    # Données et documents 10-K/10-Q
-├── notebooks/              # Jupyter notebooks pour analyse exploratoire
-├── src/                    # Code source Python
-├── reports/                # Rapports d'analyse générés
-└── README.md              # Ce fichier
+data-integration/        # Extraction + analysis pipeline
+notebooks/               # Task notebooks (exploration / prototypes)
+data/                    # Local outputs (only Dashboard 2 is tracked)
+generate_dashboards.py   # Generates dashboard images
+run_full_pipeline.py     # End-to-end runner
 ```
 
-## Tâche 1 : Extraction et Analyse des Données Financières
+## Dashboard (Task 1)
 
-### Objectifs de la Tâche 1
-1. Extraire les données clés des documents 10-K
-2. Identifier les indicateurs financiers importants
-3. Analyser les tendances financières
-4. Évaluer la santé financière des entreprises
-5. Préparer les données pour l'intégration du modèle IA
+This is the current “clean” dashboard export (Dashboard 2):
 
-### Livrables
-- Rapport d'analyse complète des données financières
-- Résumé des insights financiers
-- Données préparées et nettoyées
+![Dashboard 2: Financial Health & Benchmarking](data/dashboard_2_health_benchmark.png)
 
-## Technologies utilisées
+## Tech stack
 
-- Python 3.x
-- Pandas (analyse de données)
-- NumPy (calculs numériques)
-- Jupyter Notebooks
-- LangChain/LLMs (pour traitement IA)
+- Python
+- pandas, NumPy
+- SEC/EDGAR extraction tooling
+- SQLite
+- Matplotlib, Seaborn
 
-## Installation
+## Run
 
-À compléter en fonction des besoins du projet.
+- Create a virtual environment and install deps: `pip install -r requirements.txt`
+- Run end-to-end: `python run_full_pipeline.py`
+- Generate dashboards only: `python generate_dashboards.py`
 
-## Statut du projet
+## Status
 
-**Phase actuelle** : Tâche 1 - Extraction et Analyse des Données
-**Dates clés** : Implémentation prévue dans le prochain trimestre financier
+Current focus: **Task 1 (data extraction + initial analysis)**.
 
 ---
-*Projet GenAI Consulting - BCG*
-*Client : Global Finance Corp. (GFC)*
+Client (simulation): Global Finance Corp. (GFC)
