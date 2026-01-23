@@ -24,5 +24,14 @@ venv/
 data/financial_analyzer.db
 data/financial_data_raw.csv
 
+# Generated analysis outputs / artifacts (reproducible)
+data/analysis/
+data/*.png
+
+# Pipeline run artifacts
+pipeline_run.log
+extraction.log
+extraction_full.log
+
 # Optional: if you regenerate lots of local files
 # data/analysis/*.csv
