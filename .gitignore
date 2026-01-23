@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+.venv/
+
+# OS / editor
+.DS_Store
+.vscode/
+
+# Logs
+*.log
+
+# Data outputs (keep lightweight analysis outputs + dashboards)
+data/financial_analyzer.db
+data/financial_data_raw.csv
+
+# Optional: if you regenerate lots of local files
+# data/analysis/*.csv

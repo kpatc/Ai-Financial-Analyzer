@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Chatbot - Interactive Financial Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            height: 85vh;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            overflow: hidden;
+        }
+
+        /* Main Chat Area */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .chat-header p {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
+
+        .reset-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid white;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+
+        .reset-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 16px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .message.bot {
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        .message.user .message-content {
+            background: #667eea;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.bot .message-content {
+            background: #e9ecef;
+            color: #333;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+            padding: 0 12px;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            background: white;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            max-width: 100%;
+            height: 250px;
+        }
+
+        .chart-container canvas {
+            max-height: 220px;
+        }
+
+        /* Interactive Elements */
+        .interactive-section {
+            background: #f0f4f8;
+            border-left: 3px solid #667eea;
+            padding: 10px 12px;
+            margin: 8px 0;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .interactive-section strong {
+            color: #667eea;
+        }
+
+        .suggestion-item {
+            display: inline-block;
+            background: white;
+            padding: 4px 8px;
+            margin: 2px 4px 2px 0;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #667eea;
+            cursor: pointer;
+            border: 1px solid #667eea;
+            transition: all 0.3s;
+        }
+
+        .suggestion-item:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        /* Loading indicator */
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .loading-dots {
+            display: inline-flex;
+            gap: 4px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #667eea;
+            animation: pulse 1.4s infinite;
+        }
+
+        .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 16px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 8px;
+        }
+
+        .input-container {
+            flex: 1;
+            display: flex;
+            gap: 8px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            border-left: 1px solid #e0e0e0;
+            background: #f8f9fa;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .sidebar-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .sidebar-title {
+            font-weight: 600;
+            color: #333;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sidebar-item {
+            padding: 8px 12px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            cursor: pointer;
+            font-size: 12px;
+            color: #667eea;
+            transition: all 0.3s;
+        }
+
+        .sidebar-item:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+            transform: translateX(4px);
+        }
+
+        .metrics-list {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .metrics-list li {
+            margin-bottom: 4px;
+            margin-left: 16px;
+        }
+
+        /* Error messages */
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid #fcc;
+            margin: 8px 0;
+            font-size: 13px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                display: none;
+            }
+
+            .message-content {
+                max-width: 85%;
+            }
+
+            .chat-header h1 {
+                font-size: 18px;
+            }
+
+            .chart-container {
+                height: 200px;
+            }
+        }
+
+        /* Scrollbar styling */
+        .messages-area::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .messages-area::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .messages-area::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 4px;
+        }
+
+        .messages-area::-webkit-scrollbar-thumb:hover {
+            background: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Chat Area -->
+        <div class="chat-container">
+            <!-- Header -->
+            <div class="chat-header">
+                <div>
+                    <h1>Financial Chatbot</h1>
+                    <p>Interactive Financial Analysis for Microsoft & Apple</p>
+                </div>
+                <button class="reset-btn" onclick="resetChat()">Clear Chat</button>
+            </div>
+
+            <!-- Messages -->
+            <div id="messagesArea" class="messages-area"></div>
+
+            <!-- Input -->
+            <div class="input-area">
+                <div class="input-container">
+                    <input 
+                        type="text" 
+                        id="userInput" 
+                        placeholder="Ask about revenue, profitability, financial health... (press Enter to send)"
+                        onkeypress="handleKeyPress(event)"
+                    >
+                </div>
+                <button onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-section">
+                <div class="sidebar-title">Quick Topics</div>
+                <button class="sidebar-item" onclick="sendQuery('What is Microsoft revenue?')">Microsoft Revenue</button>
+                <button class="sidebar-item" onclick="sendQuery('Compare profitability')">Profitability</button>
+                <button class="sidebar-item" onclick="sendQuery('Show financial trends')">Trends</button>
+                <button class="sidebar-item" onclick="sendQuery('Compare companies')">Comparison</button>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Analysis Types</div>
+                <ul class="metrics-list">
+                    <li>Revenue Analysis</li>
+                    <li>Profitability</li>
+                    <li>Cash Flow</li>
+                    <li>Leverage & Debt</li>
+                    <li>Efficiency</li>
+                    <li>Growth Trends</li>
+                </ul>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="sidebar-title">Companies</div>
+                <button class="sidebar-item" onclick="sendQuery('Tell me about Microsoft')">Microsoft</button>
+                <button class="sidebar-item" onclick="sendQuery('Tell me about Apple')">Apple</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+        let chartInstance = null;
+
+        function formatTime(date) {
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function addMessage(content, isUser = false, metadata = null) {
+            const messagesArea = document.getElementById('messagesArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+
+            if (isUser) {
+                contentDiv.textContent = content;
+            } else {
+                // Add bot message text
+                const textDiv = document.createElement('div');
+                textDiv.innerHTML = content.replace(/\n/g, '<br>');
+                contentDiv.appendChild(textDiv);
+
+                // Add chart if visualization available
+                if (metadata && metadata.visualization && metadata.visualization.chartData && 
+                    Object.keys(metadata.visualization.chartData).length > 0) {
+                    
+                    const chartDiv = document.createElement('div');
+                    chartDiv.className = 'chart-container';
+                    
+                    const canvas = document.createElement('canvas');
+                    canvas.id = 'dataChart_' + Date.now();
+                    chartDiv.appendChild(canvas);
+                    contentDiv.appendChild(chartDiv);
+
+                    // Render chart after a brief delay to ensure DOM is ready
+                    setTimeout(() => {
+                        renderChart(canvas.id, metadata.visualization.chartData, metadata.visualization.chartType);
+                    }, 100);
+                }
+
+                // Add interactive suggestions
+                if (metadata && metadata.interactive) {
+                    if (metadata.interactive.followUpQuestions && metadata.interactive.followUpQuestions.length > 0) {
+                        const sugDiv = document.createElement('div');
+                        sugDiv.className = 'interactive-section';
+                        sugDiv.innerHTML = '<strong>Follow-up questions:</strong><br>';
+                        
+                        metadata.interactive.followUpQuestions.slice(0, 3).forEach(q => {
+                            const btn = document.createElement('span');
+                            btn.className = 'suggestion-item';
+                            btn.textContent = q;
+                            btn.onclick = () => sendQuery(q);
+                            sugDiv.appendChild(btn);
+                        });
+                        
+                        contentDiv.appendChild(sugDiv);
+                    }
+
+                    if (metadata.interactive.relatedTopics && metadata.interactive.relatedTopics.length > 0) {
+                        const relDiv = document.createElement('div');
+                        relDiv.className = 'interactive-section';
+                        relDiv.innerHTML = '<strong>Related topics:</strong><br>';
+                        
+                        metadata.interactive.relatedTopics.forEach(topic => {
+                            const btn = document.createElement('span');
+                            btn.className = 'suggestion-item';
+                            btn.textContent = topic;
+                            btn.onclick = () => sendQuery(topic);
+                            relDiv.appendChild(btn);
+                        });
+                        
+                        contentDiv.appendChild(relDiv);
+                    }
+                }
+            }
+
+            messageDiv.appendChild(contentDiv);
+
+            // Add timestamp
+            const timeDiv = document.createElement('div');
+            timeDiv.className = 'message-time';
+            timeDiv.textContent = formatTime(new Date());
+            messageDiv.appendChild(timeDiv);
+
+            messagesArea.appendChild(messageDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+        }
+
+        function renderChart(canvasId, chartData, chartType = 'bar') {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+
+            const ctx = canvas.getContext('2d');
+
+            // Destroy existing chart if any
+            if (Chart.helpers && Chart.helpers.each) {
+                Chart.helpers.each(Chart.instances, function(instance) {
+                    if (instance.chart.canvas === canvas) {
+                        instance.destroy();
+                    }
+                });
+            }
+
+            try {
+                new Chart(ctx, {
+                    type: chartType,
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'top',
+                                labels: {
+                                    font: { size: 11 },
+                                    padding: 12
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                                ticks: { font: { size: 11 } }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { font: { size: 11 } }
+                            }
+                        }
+                    }
+                });
+            } catch (e) {
+                console.error('Chart render error:', e);
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const message = input.value.trim();
+
+            if (!message) return;
+
+            // Add user message
+            addMessage(message, true);
+            input.value = '';
+
+            // Show loading
+            const messagesArea = document.getElementById('messagesArea');
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'message bot';
+            loadingDiv.innerHTML = `
+                <div class="message-content loading">
+                    <span>Analyzing...</span>
+                    <div class="loading-dots">
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                    </div>
+                </div>
+            `;
+            messagesArea.appendChild(loadingDiv);
+            messagesArea.scrollTop = messagesArea.scrollHeight;
+
+            try {
+                const response = await fetch(`${API_BASE}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message })
+                });
+
+                const data = await response.json();
+
+                // Remove loading message
+                loadingDiv.remove();
+
+                if (response.ok) {
+                    addMessage(data.response, false, data);
+                } else {
+                    addMessage(`Error: ${data.error || 'Unknown error'}`, false);
+                }
+            } catch (error) {
+                loadingDiv.remove();
+                addMessage(`Connection error: ${error.message}`, false);
+            }
+        }
+
+        function sendQuery(query) {
+            document.getElementById('userInput').value = query;
+            sendMessage();
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        async function resetChat() {
+            if (confirm('Clear all messages? This cannot be undone.')) {
+                document.getElementById('messagesArea').innerHTML = '';
+                
+                try {
+                    await fetch(`${API_BASE}/chat/reset`, { method: 'POST' });
+                    addMessage('Chat history cleared. How can I help you with financial analysis?', false);
+                } catch (error) {
+                    console.error('Reset error:', error);
+                }
+            }
+        }
+
+        // Initialize with welcome message
+        window.addEventListener('load', () => {
+            addMessage('Welcome to Financial Chatbot! I can analyze financial metrics, compare companies, and identify trends. Try asking about revenue, profitability, cash flow, leverage, or growth. What would you like to know?', false);
+        });
+    </script>
+</body>
+</html>

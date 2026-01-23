@@ -1,0 +1,15 @@
+pandas 
+numpy 
+jupyter
+matplotlib
+plotly
+seaborn
+edgartools
+sqlalchemy
+psycopg2-binary
+chromadb
+sentence-transformers
+python-dotenv
+pytest
+pytest-cov
+ipython # For notebook support
