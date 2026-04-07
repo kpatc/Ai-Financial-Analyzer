@@ -12,19 +12,19 @@ A comprehensive financial analysis platform built during the **BCG GenAI Job Sim
 
 ---
 
-## 🎯 Features
+##  Features
 
-- **🔍 SEC EDGAR Data Extraction** — Automatically extract financial data from 10-K and 10-Q filings for 33+ companies
-- **📊 Advanced Financial Analysis** — Calculate 30+ financial metrics and ratios including liquidity, profitability, leverage, and efficiency ratios
-- **📈 Historical Metrics & Growth Trends** — 3-year CAGR calculations and year-over-year analysis
-- **💬 AI-Powered Chatbot** — Natural language interface for financial queries with intelligent response formatting
-- **🎨 Interactive Visualizations** — Dynamic charts and tables for data exploration
-- **🔄 Semantic Search** — Vector-based search using Sentence-Transformers for contextual queries
-- **🚀 Production-Ready API** — Flask REST API with comprehensive endpoints for data retrieval and analysis
+-  SEC EDGAR Data Extraction — Automatically extract financial data from 10-K and 10-Q filings for 33+ companies
+-  Advanced Financial Analysis — Calculate 30+ financial metrics and ratios including liquidity, profitability, leverage, and efficiency ratios
+-  Historical Metrics & Growth Trends — 3-year CAGR calculations and year-over-year analysis
+- AI-Powered Chatbot — Natural language interface for financial queries with intelligent response formatting
+-  Interactive Visualizations — Dynamic charts and tables for data exploration
+-  Semantic Search — Vector-based search using Sentence-Transformers for contextual queries
+-  Production-Ready API — Flask REST API with comprehensive endpoints for data retrieval and analysis
 
 ---
 
-## 📸 Interactive Chatbot Interface
+##  Interactive Chatbot Interface
 
 ![Chatbot Interface](./docs/chatbot_interface.png)
 
@@ -37,7 +37,7 @@ The intuitive web-based interface provides real-time financial analysis with:
 
 ---
 
-## 📊 Financial Health Dashboard
+##  Financial Health Dashboard
 
 ![Financial Dashboard](./docs/dashboard_2_health_benchmark.png)
 
@@ -49,7 +49,7 @@ Visual benchmark dashboard showing:
 
 ---
 
-## 🏗️ System Architecture
+##  System Architecture
 
 ```
 SEC EDGAR 10-K/10-Q Filings
@@ -91,7 +91,7 @@ SEC EDGAR 10-K/10-Q Filings
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 - Python 3.9+ with pip
@@ -138,7 +138,7 @@ Visit **http://localhost:5173** in your browser to access the chatbot interface.
 
 ---
 
-## 📋 Core Components
+##  Core Components
 
 ### 1. Data Extraction Pipeline
 
@@ -237,101 +237,10 @@ Natural language interface powered by **Groq LLM** with intelligent response for
 - "Show liquidity ratios for tech companies"
 - "Explain Tesla's debt situation"
 
----
-
-## 🔌 API Endpoints
-
-### Base URL: `http://localhost:5000`
-
-#### Chat & Query
-- `POST /api/chat` — Send message, get AI analysis with optional charts/tables
-- `POST /api/reset` — Reset chat session
-- `GET /api/companies` — List all available companies
-
-#### Financial Data Tables
-- `GET /api/tables/metrics` — Financial metrics table with sorting/filtering
-- `GET /api/tables/ratios` — Ratios table with category filtering
-- `GET /api/company/{ticker}/full-analysis` — Comprehensive single-company analysis
-- `GET /api/sector/{sector}/analysis` — Sector-wide analysis and comparisons
-
-#### Data Retrieval
-- `GET /api/metrics/{ticker}` — Retrieve financial metrics for a company
-- `GET /api/ratios/{ticker}` — Retrieve calculated ratios
-- `GET /api/compare` — Compare metrics across multiple companies (query params: `tickers=MSFT,AAPL,GOOGL`)
 
 ---
 
-## 📁 Directory Structure
-
-```
-Ai-Financial-Analyzer/
-├── data-integration/              # Data extraction & analysis
-│   ├── config.py                  # Centralized configuration
-│   ├── extraction/
-│   │   └── extract_10k_data.py   # SEC EDGAR extraction logic
-│   ├── analysis/
-│   │   └── analysis_calculator.py # Metrics & ratios calculation
-│   ├── db/
-│   │   ├── init_db.py            # Database schema
-│   │   ├── loaders.py            # Data loading to SQLite
-│   │   └── vector_sync.py        # Chroma vector DB sync
-│   ├── schemas/
-│   │   └── models.py             # SQLAlchemy ORM models
-│   └── pipelines/
-│       └── pipeline.py           # Orchestrator
-│
-├── chatbot/                       # Flask API & frontend
-│   ├── config.py                  # Chatbot configuration
-│   ├── api.py                     # Flask REST API server
-│   ├── core.py                    # Chatbot logic & routing
-│   ├── rag_engine.py             # NLP & semantic search
-│   ├── db_client.py              # Database query interface
-│   ├── db_migration.py           # Schema migrations
-│   ├── response_formatter.py     # Response formatting utilities
-│   ├── smart_response.py         # Intelligent response generation
-│   ├── company_names.py          # Company ticker mappings
-│   └── frontend/                 # React + Vite
-│       ├── src/
-│       │   ├── App.jsx
-│       │   ├── components/
-│       │   │   ├── Header.jsx
-│       │   │   ├── Sidebar.jsx
-│       │   │   ├── ChatArea.jsx
-│       │   │   ├── Message.jsx
-│       │   │   ├── InputArea.jsx
-│       │   │   └── FinancialTable.jsx
-│       │   ├── hooks/
-│       │   │   └── useChat.js
-│       │   ├── services/
-│       │   │   └── api.js
-│       │   └── utils/
-│       └── package.json
-│
-├── data/                          # Generated data
-│   ├── financial_analyzer.db      # SQLite database
-│   ├── financial_data_raw.csv     # Extracted raw data
-│   └── analysis/                  # Generated analysis CSVs
-│
-├── docs/                          # Documentation & screenshots
-│   ├── chatbot_interface.png
-│   └── dashboard_2_health_benchmark.png
-│
-├── notebooks/                     # Exploration & analysis
-│   ├── task1_data_analysis.ipynb
-│   └── task2_chatbot_prototype.ipynb
-│
-├── run_full_pipeline.py          # Main orchestration script
-├── load_to_database.py           # Database loading utility
-├── query_database.py             # Database query utility
-├── generate_dashboards.py        # Dashboard generation
-├── requirements.txt              # Python dependencies
-├── CLAUDE.md                      # Claude Code guidance
-└── README.md                      # This file
-```
-
----
-
-## 🛠️ Technology Stack
+##  Technology Stack
 
 ### Backend
 - **Python 3.9+** — Core programming language
@@ -399,7 +308,7 @@ CHROMA_COLLECTION=financial_documents
 
 ---
 
-## 📊 Database Schema
+##  Database Schema
 
 ### Key Tables
 
@@ -420,7 +329,7 @@ CHROMA_COLLECTION=financial_documents
 
 ---
 
-## 🎓 Usage Examples
+##  Usage Examples
 
 ### Example 1: Query a Company's Profitability
 
@@ -457,7 +366,7 @@ coverage ratios above 20x.
 
 ---
 
-## 🔍 Data Sources
+##  Data Sources
 
 - **SEC EDGAR** — official SEC filing database (https://www.sec.gov/edgar/)
 - **10-K Forms** — Annual reports with comprehensive financial data
@@ -466,7 +375,7 @@ coverage ratios above 20x.
 
 ---
 
-## 📈 Performance & Optimization
+##  Performance & Optimization
 
 - **Vector Search:** ~50ms response time for semantic queries
 - **Chart Generation:** <100ms for dynamic visualization
@@ -475,24 +384,7 @@ coverage ratios above 20x.
 
 ---
 
-## 🤝 Contributing
-
-This is a simulation project for the BCG GenAI Job Simulation. For modifications or improvements:
-
-1. Update CLAUDE.md with relevant architecture changes
-2. Test with `run_full_pipeline.py` to ensure data integrity
-3. Validate API responses with various query types
-4. Update documentation for significant changes
-
----
-
-## 📝 License
-
-MIT License — See LICENSE file for details
-
----
-
-## 🙋 Support & Documentation
+##  Support & Documentation
 
 - **CLAUDE.md** — Detailed architecture and development guidance
 - **chatbot/README.md** — Detailed API documentation and endpoint reference
@@ -500,21 +392,6 @@ MIT License — See LICENSE file for details
 - **Notebooks** — Exploration and analysis examples (task1, task2)
 
 ---
-
-## 🎯 Project Status
-
-**Status:** ✅ Complete & Production-Ready
-
-**Completed Features:**
-- ✅ SEC EDGAR data extraction (33+ companies, 3 years)
-- ✅ Financial metrics & ratios calculation (30+ metrics)
-- ✅ SQLite & Chroma vector databases
-- ✅ Flask REST API with 8+ endpoints
-- ✅ React + Vite + Tailwind CSS frontend
-- ✅ AI-powered chatbot with Groq LLM
-- ✅ Intelligent response formatting
-- ✅ Dynamic visualization (charts & tables)
-- ✅ Semantic search capabilities
 
 **Simulation:** BCG GenAI Job Simulation (Forage)  
 **Last Updated:** April 2026
