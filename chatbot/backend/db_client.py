@@ -385,9 +385,15 @@ class FinancialDBClient:
 
                 # Profitability
                 if prof:
-                    comparison_item['net_margin_pct'] = round(prof.get('net_margin_pct', 0), 2)
-                    comparison_item['operating_margin_pct'] = round(prof.get('operating_margin_pct', 0), 2)
-                    comparison_item['gross_margin_pct'] = round(prof.get('gross_margin_pct', 0), 2)
+                    gm = prof.get('gross_margin_pct')
+                    om = prof.get('operating_margin_pct')
+                    nm = prof.get('net_margin_pct')
+                    if gm is not None:
+                        comparison_item['gross_margin_pct'] = round(gm, 2)
+                    if om is not None:
+                        comparison_item['operating_margin_pct'] = round(om, 2)
+                    if nm is not None:
+                        comparison_item['net_margin_pct'] = round(nm, 2)
 
                 # Ratios (always include basic ones)
                 if ratios:
@@ -400,20 +406,36 @@ class FinancialDBClient:
                 if include_all_ratios:
                     # Liquidity
                     if liquidity:
-                        comparison_item['current_ratio'] = round(liquidity.get('current_ratio', 0), 2)
-                        comparison_item['quick_ratio'] = round(liquidity.get('quick_ratio', 0), 2)
-                        comparison_item['cash_ratio'] = round(liquidity.get('cash_ratio', 0), 2)
+                        cr = liquidity.get('current_ratio')
+                        qr = liquidity.get('quick_ratio')
+                        ca = liquidity.get('cash_ratio')
+                        if cr is not None:
+                            comparison_item['current_ratio'] = round(cr, 2)
+                        if qr is not None:
+                            comparison_item['quick_ratio'] = round(qr, 2)
+                        if ca is not None:
+                            comparison_item['cash_ratio'] = round(ca, 2)
 
                     # Leverage
                     if leverage:
-                        comparison_item['debt_ratio'] = round(leverage.get('debt_ratio', 0), 2)
-                        comparison_item['interest_coverage'] = round(leverage.get('interest_coverage', 0), 2)
+                        dr = leverage.get('debt_ratio')
+                        ic = leverage.get('interest_coverage')
+                        if dr is not None:
+                            comparison_item['debt_ratio'] = round(dr, 2)
+                        if ic is not None:
+                            comparison_item['interest_coverage'] = round(ic, 2)
 
                     # Efficiency
                     if efficiency:
-                        comparison_item['receivables_turnover'] = round(efficiency.get('receivables_turnover', 0), 2)
-                        comparison_item['inventory_turnover'] = round(efficiency.get('inventory_turnover', 0), 2)
-                        comparison_item['roc_pct'] = round(efficiency.get('roc_pct', 0), 2)
+                        rt = efficiency.get('receivables_turnover')
+                        it = efficiency.get('inventory_turnover')
+                        roc = efficiency.get('roc_pct')
+                        if rt is not None:
+                            comparison_item['receivables_turnover'] = round(rt, 2)
+                        if it is not None:
+                            comparison_item['inventory_turnover'] = round(it, 2)
+                        if roc is not None:
+                            comparison_item['roc_pct'] = round(roc, 2)
 
                 comparison.append(comparison_item)
 
