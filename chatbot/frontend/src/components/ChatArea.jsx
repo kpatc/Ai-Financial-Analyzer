@@ -27,15 +27,18 @@ export default function ChatArea({ messages, isLoading, onSendMessage, onResetCh
             <div className="text-center max-w-md">
               <h1 className="text-3xl font-bold text-accent mb-2">FinanceAI</h1>
               <p className="text-dark-text-muted mb-6">
-                Welcome! I'm your financial analyst assistant. Ask me anything about company metrics, trends, or comparisons.
+                Financial Intelligence at Your Fingertips. Analyze company metrics, track trends, and make data-driven decisions.
               </p>
-              <div className="space-y-2 text-sm text-dark-text-muted">
-                <p>💡 Try:</p>
-                <ul className="space-y-1">
-                  <li>"What is Apple's revenue trend?"</li>
-                  <li>"Compare Microsoft and Google"</li>
-                  <li>"Show me the most profitable companies"</li>
-                </ul>
+              <div className="space-y-3 text-sm text-dark-text-muted">
+                <div>
+                  <p className="font-semibold text-dark-text mb-2">📊 Get Started:</p>
+                  <ul className="space-y-1 text-left ml-4">
+                    <li>• "Apple revenue trends"</li>
+                    <li>• "Compare Microsoft vs Google"</li>
+                    <li>• "Most profitable tech companies"</li>
+                    <li>• "Explain Microsoft profitability"</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>

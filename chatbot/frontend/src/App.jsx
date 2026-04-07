@@ -18,13 +18,13 @@ function App() {
 
     // Load companies
     chatAPI.getCompanies()
-      .then(data => setCompanies(data.companies || []))
+      .then(data => {
+        const tickers = (data.companies || []).map(c => c.ticker)
+        setCompanies(tickers)
+      })
       .catch(err => console.error('Failed to load companies:', err))
 
-    // Send welcome message
-    chat.messages.length === 0 && setTimeout(() => {
-      chat.sendMessage('Hello!')
-    }, 100)
+    // Don't send LLM message - show static welcome instead
   }, [])
 
   const updateTheme = (newTheme) => {
@@ -47,9 +47,15 @@ function App() {
       <Header onThemeToggle={toggleTheme} theme={theme} />
 
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar companies={companies} onSelectCompany={(ticker) => {
-          chat.sendMessage(`Tell me about ${ticker} financial performance`)
-        }} />
+        <Sidebar
+          companies={companies}
+          onCompanySelect={(ticker) => {
+            chat.sendMessage(`Tell me about ${ticker}`)
+          }}
+          onQuickAction={(action) => {
+            chat.sendMessage(action)
+          }}
+        />
 
         <ChatArea
           messages={chat.messages}

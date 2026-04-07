@@ -1,67 +1,92 @@
-export default function Sidebar({ companies, onSelectCompany }) {
+import React from 'react';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import BalanceIcon from '@mui/icons-material/Balance';
+import ComputerIcon from '@mui/icons-material/Computer';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import LocalHospitalIcon from '@mui/icons-material/LocalHospital';
+import ElectricBoltIcon from '@mui/icons-material/ElectricBolt';
+import { COMPANY_NAMES } from '../utils/companyNames';
+
+export default function Sidebar({ companies, onCompanySelect, onQuickAction }) {
   const quickActions = [
-    { label: '📈 Revenue Trends', query: 'What is the revenue trend?' },
-    { label: '💰 Profitability', query: 'Show me profitability metrics' },
-    { label: '📊 Leverage', query: 'Show debt-to-equity ratios' },
-  ]
+    { label: 'Revenue Trends', icon: TrendingUpIcon },
+    { label: 'Profitability', icon: AttachMoneyIcon },
+    { label: 'Leverage', icon: BalanceIcon },
+  ];
 
   const sectors = [
-    { label: '🖥️ Technology', query: 'Tech companies analysis' },
-    { label: '🏦 Finance', query: 'Financial institutions' },
-    { label: '🏥 Healthcare', query: 'Healthcare sector' },
-    { label: '⚡ Energy', query: 'Energy companies' },
-  ]
+    { label: 'Technology', icon: ComputerIcon },
+    { label: 'Finance', icon: AccountBalanceIcon },
+    { label: 'Healthcare', icon: LocalHospitalIcon },
+    { label: 'Energy', icon: ElectricBoltIcon },
+  ];
 
   return (
-    <div className="w-80 bg-dark-bg-secondary border-r border-dark-border overflow-y-auto p-4 flex flex-col gap-6">
-      {/* Quick Actions */}
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-dark-text-muted mb-3 px-2">Quick Actions</h3>
+    <div className="w-64 bg-dark-bg-secondary flex flex-col border-r border-dark-border h-screen">
+      
+      {/* QUICK ACTIONS - Top Section */}
+      <div className="p-4 border-b border-dark-border">
+        <h3 className="text-xs font-bold text-accent uppercase tracking-wider mb-3">
+          Quick Actions
+        </h3>
         <div className="space-y-2">
-          {quickActions.map((action, i) => (
-            <button
-              key={i}
-              onClick={() => window.dispatchEvent(new CustomEvent('sendQuery', { detail: action.query }))}
-              className="w-full text-left px-3 py-2 rounded-lg bg-dark-card hover:bg-dark-card-hover hover:border-accent border border-dark-border text-sm font-medium text-dark-text transition-all"
-            >
-              {action.label}
-            </button>
-          ))}
+          {quickActions.map((action, idx) => {
+            const Icon = action.icon;
+            return (
+              <button
+                key={idx}
+                onClick={() => onQuickAction && onQuickAction(action.label)}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-card hover:bg-dark-border transition-colors text-dark-text text-sm font-medium border border-dark-border"
+              >
+                <Icon style={{ fontSize: '18px', color: '#6366f1' }} />
+                {action.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Sectors */}
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-dark-text-muted mb-3 px-2">Sectors</h3>
+      {/* SECTORS - Middle Section */}
+      <div className="p-4 border-b border-dark-border">
+        <h3 className="text-xs font-bold text-accent uppercase tracking-wider mb-3">
+          Sectors
+        </h3>
         <div className="space-y-2">
-          {sectors.map((sector, i) => (
-            <button
-              key={i}
-              onClick={() => window.dispatchEvent(new CustomEvent('sendQuery', { detail: sector.query }))}
-              className="w-full text-left px-3 py-2 rounded-lg bg-dark-card hover:bg-dark-card-hover hover:border-accent border border-dark-border text-sm font-medium text-dark-text transition-all"
-            >
-              {sector.label}
-            </button>
-          ))}
+          {sectors.map((sector, idx) => {
+            const Icon = sector.icon;
+            return (
+              <button
+                key={idx}
+                onClick={() => onQuickAction && onQuickAction(`Sector: ${sector.label}`)}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-dark-card hover:bg-dark-border transition-colors text-dark-text text-sm font-medium border border-dark-border"
+              >
+                <Icon style={{ fontSize: '18px', color: '#6366f1' }} />
+                {sector.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Companies */}
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-dark-text-muted mb-3 px-2">Companies</h3>
-        <div className="space-y-1 max-h-64 overflow-y-auto">
-          {companies.slice(0, 12).map((company) => (
+      {/* COMPANIES - Scrollable Section */}
+      <div className="flex-1 flex flex-col px-4 py-4 overflow-hidden">
+        <h3 className="text-xs font-bold text-accent uppercase tracking-wider mb-2">
+          Companies
+        </h3>
+        <div className="flex-1 overflow-y-auto space-y-1 pr-2">
+          {companies.map((ticker) => (
             <button
-              key={company.ticker}
-              onClick={() => onSelectCompany(company.ticker)}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-dark-card border border-transparent hover:border-dark-border text-sm text-dark-text transition-all"
+              key={ticker}
+              onClick={() => onCompanySelect && onCompanySelect(ticker)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-dark-border transition-colors text-dark-text text-sm font-medium text-left"
             >
-              <span className="font-medium">{company.ticker}</span>
-              <span className="w-2 h-2 rounded-full bg-green-500"></span>
+              <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0"></span>
+              <span className="truncate">{COMPANY_NAMES[ticker] || ticker}</span>
             </button>
           ))}
         </div>
       </div>
     </div>
-  )
+  );
 }

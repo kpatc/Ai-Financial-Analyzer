@@ -16,6 +16,7 @@ from config import GEMINI_CONFIG, GROQ_CONFIG, LLM_PROVIDER, QUERY_CATEGORIES, S
 from db_client import FinancialDBClient
 from vector_sync import VectorSync
 from response_formatter import ResponseFormatter, format_comparison_insights
+from company_names import get_company_name
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +141,7 @@ class RAGEngine:
         Returns:
             Dict {tickers: [], category: str, metrics: [], time_period: str}
         """
+        import re
         query_lower = query.lower()
         entities = {
             'tickers': [],
@@ -148,11 +150,22 @@ class RAGEngine:
             'time_period': 'latest'
         }
 
-        # Detect tickers (by name or symbol)
+        # Detect tickers (by name or symbol) - prioritize full names
         company_mapping = self._get_company_mapping()
-        for name_or_ticker, ticker in company_mapping.items():
-            if name_or_ticker in query_lower:
-                entities['tickers'].append(ticker)
+
+        # First pass: detect full company names (longer matches take priority)
+        sorted_mapping = sorted(company_mapping.items(), key=lambda x: len(x[0]), reverse=True)
+
+        for name_or_ticker, ticker in sorted_mapping:
+            # For short tickers (1-2 chars), use word boundaries to avoid false matches
+            if len(name_or_ticker) <= 2:
+                pattern = r'\b' + re.escape(name_or_ticker) + r'\b'
+                if re.search(pattern, query_lower):
+                    entities['tickers'].append(ticker)
+            else:
+                # For longer names, regular substring match is OK
+                if name_or_ticker in query_lower:
+                    entities['tickers'].append(ticker)
 
         # Detect category (highest priority keyword match)
         max_score = 0
@@ -325,7 +338,8 @@ class RAGEngine:
             context_parts.append("\nPRECISE FINANCIAL METRICS:")
             for company in precise_data['companies_data']:
                 ticker = company.get('ticker', '?')
-                context_parts.append(f"\n{ticker} Financial Data:")
+                company_name = get_company_name(ticker)
+                context_parts.append(f"\n{company_name} ({ticker}) Financial Data:")
 
                 # Metrics
                 context_parts.append(f"  Revenue: ${company.get('revenue', 0) / 1e9:.2f}B")
@@ -851,14 +865,16 @@ For comparisons between companies, include both tickers in title"""
             history: Conversation history
 
         Returns:
-            {response, sources, category, chart_hint}
+            {response, sources, category, chart, table}
         """
         if not query or len(query) > 500:
             return {
                 'response': 'Query too long. Please keep it under 500 characters.',
                 'sources': [],
                 'category': None,
-                'chart_hint': None
+                'chart': None,
+                'table': None,
+                'entities': {}
             }
 
         # Detect entities
@@ -869,11 +885,16 @@ For comparisons between companies, include both tickers in title"""
         semantic_docs = self.retrieve_semantic(query, n_results=3)
         precise_data = self.retrieve_precise(entities)
 
-        # Build context
+        # Build context with company names
         context = self.build_context(semantic_docs, precise_data, entities)
 
         # Generate response
         response_text = self.generate(query, context, history)
+
+        # Shorten response if not requesting details
+        from smart_response import should_give_details, shorten_response
+        if not should_give_details(query):
+            response_text = shorten_response(response_text, max_sentences=2)
 
         # Extract sources
         sources = []
@@ -926,19 +947,54 @@ For comparisons between companies, include both tickers in title"""
             )
             logger.debug(f"Chart config generated: {bool(chart_config)}")
 
-            # Add structured table data for comparisons
-            if len(tickers) > 1:
+            # Add structured table data based on query type
+            from smart_response import should_use_table, create_metrics_table_from_data, create_comparison_table
+            should_table, table_type = should_use_table(query, tickers, entities)
+
+            if should_table:
                 try:
-                    comparison = self._get_db().get_comparison(tickers, include_all_ratios=True)
-                    if comparison:
-                        table_data = {
-                            'type': 'comparison',
-                            'data': comparison,
-                            'columns': ['ticker', 'name', 'sector', 'revenue_billions', 'net_income_billions',
-                                       'net_margin_pct', 'debt_to_equity', 'roa_pct']
-                        }
+                    if table_type == 'comparison' and len(tickers) > 1:
+                        # Multi-company comparison table
+                        comparison = self._get_db().get_comparison(tickers, include_all_ratios=True)
+                        if comparison:
+                            # Map ticker to company name
+                            for item in comparison:
+                                item['company_name'] = item.get('name', item.get('ticker'))
+                            table_data = create_comparison_table(comparison)
+
+                    elif table_type == 'trends' and len(tickers) == 1:
+                        # Single company multi-year trends
+                        ticker = tickers[0]
+                        company = self._get_db().get_company_by_ticker(ticker)
+                        company_name = get_company_name(ticker)
+
+                        # Get all metrics for past 3 years
+                        revenue_trend = self._get_db().get_revenue_trend(ticker, years=3)
+                        growth = self._get_db().get_growth_metrics(ticker, years=3)
+
+                        if revenue_trend:
+                            metrics_dict = {}
+                            for trend in revenue_trend:
+                                year = str(trend['fiscal_year'])[:4]
+                                metrics_dict[year] = {
+                                    'revenue_billions': trend.get('revenue', 0) / 1e9 if trend.get('revenue') else 0,
+                                    'net_income_billions': trend.get('net_income', 0) / 1e9 if trend.get('net_income') else 0,
+                                }
+
+                            # Add ratios for latest year
+                            latest_ratios = self._get_db().get_ratios(ticker)
+                            if latest_ratios and metrics_dict:
+                                latest_year = max(metrics_dict.keys())
+                                metrics_dict[latest_year].update({
+                                    'net_margin_pct': latest_ratios.get('net_margin_pct'),
+                                    'roa_pct': latest_ratios.get('roa_pct'),
+                                    'debt_to_equity': latest_ratios.get('debt_to_equity'),
+                                })
+
+                            table_data = create_metrics_table_from_data(ticker, company_name, metrics_dict)
+
                 except Exception as e:
-                    logger.debug(f"Table data generation failed: {e}")
+                    logger.debug(f"Smart table generation failed: {e}")
         else:
             logger.debug(f"Skipping chart: category={bool(category)}, tickers={bool(tickers)}")
 

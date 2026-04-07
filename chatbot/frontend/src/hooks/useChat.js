@@ -29,6 +29,7 @@ export const useChat = () => {
         role: 'assistant',
         content: response.response,
         chart: response.chart,
+        table: response.table,
         sources: response.sources,
         category: response.category,
         timestamp: new Date(),
