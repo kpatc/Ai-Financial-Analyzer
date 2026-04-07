@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+env/
+.venv
+
+# Logs
+*.log
+chatbot.log
+
+# ChromaDB
+chroma_db/
+
+# Environment
+.env
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~

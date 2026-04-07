@@ -1,0 +1,26 @@
+Architecture Hybride : SQLite + ChromaDB
+SQLite (Base de données relationnelle)
+
+Contenu : Données structurées avec relations
+Table companies : Informations entreprises (ticker, nom, secteur, CIK)
+Table financial_metrics : Métriques financières (revenus, profits, actifs, etc.)
+Table financial_ratios : Ratios calculés (ROE, ROA, marge bénéficiaire)
+Table analyses : Résultats d'analyses sauvegardés
+Usage : Requêtes SQL classiques, agrégations, filtres par date/ticker
+Avantages : Données normalisées, relations, intégrité référentielle
+ChromaDB (Base de données vectorielle)
+
+Contenu : Embeddings de textes pour recherche sémantique
+Documents : Descriptions d'entreprises + contexte financier
+Métadonnées : ticker, secteur, période fiscale
+Vecteurs : Représentations numériques des documents
+Usage : Recherche par similarité ("entreprises tech avec forte croissance")
+Avantages : Recherche en langage naturel, pas besoin de mots-clés exacts
+Synchronisation (vector_sync.py)
+
+SQLite stocke les données brutes
+DataSynchronizer extrait périodiquement de SQLite
+Crée des documents textuels enrichis (metrics + context)
+Génère les embeddings et les stocke dans ChromaDB
+Le chatbot interroge ChromaDB pour trouver les entreprises pertinentes
+Puis récupère les détails dans SQLite via les IDs

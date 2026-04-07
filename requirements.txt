@@ -13,3 +13,10 @@ python-dotenv
 pytest
 pytest-cov
 ipython # For notebook support
+flask
+flask-cors
+chromadb
+transformers
+python-dotenv
+requests
+google-generativeai
