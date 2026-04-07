@@ -907,6 +907,7 @@ For comparisons between companies, include both tickers in title"""
         category = entities.get('category')
         tickers = entities.get('tickers', [])
         chart_config = None
+        table_data = None
 
         logger.debug(f"Chart generation: category={category}, tickers={tickers}")
 
@@ -924,6 +925,20 @@ For comparisons between companies, include both tickers in title"""
                 precise_data=enhanced_precise_data
             )
             logger.debug(f"Chart config generated: {bool(chart_config)}")
+
+            # Add structured table data for comparisons
+            if len(tickers) > 1:
+                try:
+                    comparison = self._get_db().get_comparison(tickers, include_all_ratios=True)
+                    if comparison:
+                        table_data = {
+                            'type': 'comparison',
+                            'data': comparison,
+                            'columns': ['ticker', 'name', 'sector', 'revenue_billions', 'net_income_billions',
+                                       'net_margin_pct', 'debt_to_equity', 'roa_pct']
+                        }
+                except Exception as e:
+                    logger.debug(f"Table data generation failed: {e}")
         else:
             logger.debug(f"Skipping chart: category={bool(category)}, tickers={bool(tickers)}")
 
@@ -932,6 +947,7 @@ For comparisons between companies, include both tickers in title"""
             'sources': unique_sources,
             'category': category,
             'chart': chart_config,  # Changed from chart_hint to chart
+            'table': table_data,
             'entities': entities
         }
 

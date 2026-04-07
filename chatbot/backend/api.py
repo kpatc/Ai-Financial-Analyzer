@@ -349,17 +349,30 @@ def chat():
         history = history[-max_history:]
         _conversation_histories[session_id] = history
 
-        # Chart data is now directly from RAG engine (with full config)
+        # Extract all response components
         chart_data = rag_result.get('chart')
+        table_data = rag_result.get('table')
+        entities = rag_result.get('entities', {})
 
-        # Return response
-        return jsonify({
+        # Build comprehensive response
+        response_json = {
             'response': rag_result['response'],
-            'chart': chart_data,
             'sources': rag_result.get('sources', []),
             'category': rag_result.get('category'),
             'timestamp': datetime.now().isoformat(),
-        }), 200
+            'entities': entities,
+        }
+
+        # Add chart if available
+        if chart_data:
+            response_json['chart'] = chart_data
+
+        # Add table if available
+        if table_data:
+            response_json['table'] = table_data
+
+        # Return response
+        return jsonify(response_json), 200
 
     except Exception as e:
         logger.error(f"Chat endpoint error: {e}", exc_info=True)
