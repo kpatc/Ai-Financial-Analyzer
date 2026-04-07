@@ -308,21 +308,6 @@ CHROMA_COLLECTION=financial_documents
 
 ---
 
-##  Database Schema
-
-### Key Tables
-
-**Company**
-- `id` (PK), `ticker`, `name`, `cik`, `sector`, `industry`, `created_at`
-
-**FinancialMetric**
-- `id` (PK), `company_id` (FK), `fiscal_year`, `revenue`, `net_income`, `total_assets`, `total_liabilities`, `equity`, `cash_flow_from_operations`, `etc.`
-
-**FinancialRatio**
-- `id` (PK), `company_id` (FK), `fiscal_year`, `profit_margin`, `roa`, `roe`, `current_ratio`, `debt_to_equity`, `asset_turnover`, `etc.`
-
-**Analysis**
-- `id` (PK), `company_id` (FK), `fiscal_year`, `summary`, `key_insights`, `category`, `created_at`
 
 **VectorIndexLog**
 - Tracks vector database synchronization and embeddings
@@ -382,14 +367,6 @@ coverage ratios above 20x.
 - **Database Queries:** <10ms for relational queries on indexed columns
 - **API Response:** <500ms average end-to-end (including LLM inference)
 
----
-
-##  Support & Documentation
-
-- **CLAUDE.md** — Detailed architecture and development guidance
-- **chatbot/README.md** — Detailed API documentation and endpoint reference
-- **chatbot/CHARTS_GUIDE.md** — Chart visualization types and data formats
-- **Notebooks** — Exploration and analysis examples (task1, task2)
 
 ---
 
