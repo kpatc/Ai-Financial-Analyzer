@@ -13,7 +13,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 
 import os
-from config import FLASK_CONFIG, SECURITY_CONFIG, CHART_TYPES, SQLITE_CONFIG
+from config import FLASK_CONFIG, SECURITY_CONFIG, CHART_TYPES, SQLITE_CONFIG, LOGGING_CONFIG
 from rag_engine import RAGEngine
 from db_client import FinancialDBClient
 from vector_sync import ensure_vector_db_synced
@@ -22,12 +22,13 @@ from vector_sync import ensure_vector_db_synced
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 CHATBOT_DIR = os.path.dirname(BACKEND_DIR)
 
-# Configure logging
+# Configure logging using config
+log_level = getattr(logging, LOGGING_CONFIG.get('level', 'INFO'))
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=log_level,
+    format=LOGGING_CONFIG.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'),
     handlers=[
-        logging.FileHandler('chatbot.log'),
+        logging.FileHandler(LOGGING_CONFIG.get('log_file', 'chatbot.log')),
         logging.StreamHandler()
     ]
 )
@@ -348,15 +349,13 @@ def chat():
         history = history[-max_history:]
         _conversation_histories[session_id] = history
 
-        # Build chart data if hint provided
-        chart_data = {}
-        if rag_result.get('chart_hint'):
-            chart_data = build_chart_data(rag_result['chart_hint'], get_db_client())
+        # Chart data is now directly from RAG engine (with full config)
+        chart_data = rag_result.get('chart')
 
         # Return response
         return jsonify({
             'response': rag_result['response'],
-            'chart': chart_data or None,
+            'chart': chart_data,
             'sources': rag_result.get('sources', []),
             'category': rag_result.get('category'),
             'timestamp': datetime.now().isoformat(),
@@ -462,6 +461,152 @@ def search():
 
     except Exception as e:
         logger.error(f"Search error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# TABLE DATA ENDPOINTS
+# ============================================================================
+
+@app.route('/api/tables/metrics', methods=['GET'])
+def get_metrics_table():
+    """
+    Get structured financial metrics table
+    Query params: tickers (comma-separated), fiscal_year, sort_by, limit
+    """
+    try:
+        tickers_str = request.args.get('tickers', '')
+        tickers = [t.strip().upper() for t in tickers_str.split(',')] if tickers_str else None
+        fiscal_year = request.args.get('fiscal_year', type=int)
+        sort_by = request.args.get('sort_by', 'revenue')
+        limit = request.args.get('limit', 50, type=int)
+
+        # Limit max results
+        limit = min(limit, 1000)
+
+        db = get_db_client()
+        table_data = db.get_metrics_table(tickers, fiscal_year, sort_by, limit)
+
+        return jsonify({
+            'data': table_data,
+            'count': len(table_data),
+            'columns': ['ticker', 'name', 'sector', 'fiscal_year', 'revenue', 'net_income',
+                       'operating_cash_flow', 'total_assets', 'total_liabilities', 'stockholders_equity']
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Metrics table error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tables/ratios', methods=['GET'])
+def get_ratios_table():
+    """
+    Get structured financial ratios table
+    Query params: tickers (comma-separated), fiscal_year, categories (comma-separated)
+    Categories: profitability, liquidity, leverage, efficiency
+    """
+    try:
+        tickers_str = request.args.get('tickers', '')
+        tickers = [t.strip().upper() for t in tickers_str.split(',')] if tickers_str else None
+        fiscal_year = request.args.get('fiscal_year', type=int)
+        categories_str = request.args.get('categories', '')
+        categories = [c.strip() for c in categories_str.split(',')] if categories_str else None
+
+        db = get_db_client()
+        table_data = db.get_ratios_table(tickers, fiscal_year, categories)
+
+        return jsonify({
+            'data': table_data,
+            'count': len(table_data),
+            'columns': ['ticker', 'name', 'sector', 'fiscal_year'] + (
+                ['gross_margin_pct', 'operating_margin_pct', 'net_margin_pct'] if categories is None or 'profitability' in (categories or []) else []
+            ) + (
+                ['current_ratio', 'quick_ratio'] if categories is None or 'liquidity' in (categories or []) else []
+            ) + (
+                ['debt_to_equity', 'debt_ratio'] if categories is None or 'leverage' in (categories or []) else []
+            ) + (
+                ['roa_pct', 'roe_pct', 'asset_turnover', 'interest_coverage', 'roc_pct'] if categories is None or 'efficiency' in (categories or []) else []
+            )
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Ratios table error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/company/<ticker>/full-analysis', methods=['GET'])
+def get_full_analysis(ticker):
+    """
+    Get comprehensive analysis for a single company
+    Returns: metrics, ratios (all categories), growth metrics, and sources
+    """
+    try:
+        ticker = ticker.upper()
+        db = get_db_client()
+
+        company = db.get_company_by_ticker(ticker)
+        if not company:
+            return jsonify({'error': f'Company {ticker} not found'}), 404
+
+        # Gather all data
+        metrics = db.get_company_metrics(ticker)
+        ratios = db.get_ratios(ticker)
+        profitability = db.get_profitability(ticker)
+        liquidity = db.get_liquidity(ticker)
+        leverage = db.get_leverage(ticker)
+        efficiency = db.get_efficiency(ticker)
+        growth = db.get_growth_metrics(ticker, years=3)
+        yoy = db.get_yoy_growth(ticker)
+
+        # Build comprehensive response
+        analysis = {
+            'ticker': ticker,
+            'company': {
+                'name': company['name'],
+                'sector': company['sector'],
+                'industry': company['industry'],
+                'cik': company['cik'],
+            },
+            'financials': {
+                'metrics': metrics,
+                'ratios': ratios,
+            },
+            'categories': {
+                'profitability': profitability,
+                'liquidity': liquidity,
+                'leverage': leverage,
+                'efficiency': efficiency,
+            },
+            'growth': {
+                'yoy': yoy,
+                'multi_year': growth,
+            }
+        }
+
+        return jsonify(analysis), 200
+
+    except Exception as e:
+        logger.error(f"Full analysis error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/sector/<sector>/analysis', methods=['GET'])
+def get_sector_analysis(sector):
+    """
+    Get sector-wide analysis with company comparisons
+    """
+    try:
+        db = get_db_client()
+        sector_metrics = db.get_sector_metrics(sector)
+
+        if not sector_metrics:
+            return jsonify({'error': f'Sector {sector} not found or has no data'}), 404
+
+        return jsonify(sector_metrics), 200
+
+    except Exception as e:
+        logger.error(f"Sector analysis error: {e}")
         return jsonify({'error': str(e)}), 500
 
 

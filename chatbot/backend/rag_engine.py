@@ -15,6 +15,7 @@ from groq import Groq
 from config import GEMINI_CONFIG, GROQ_CONFIG, LLM_PROVIDER, QUERY_CATEGORIES, SYSTEM_PROMPT, SQLITE_CONFIG, CHROMA_CONFIG
 from db_client import FinancialDBClient
 from vector_sync import VectorSync
+from response_formatter import ResponseFormatter, format_comparison_insights
 
 logger = logging.getLogger(__name__)
 
@@ -96,17 +97,36 @@ class RAGEngine:
             companies = self._get_db().get_all_companies()
             for company in companies:
                 ticker = company['ticker']
-                name = company['name'].lower()
+                name = company['name']
+                name_lower = name.lower()
 
-                # Add ticker
+                # Add ticker (both cases)
                 self._company_name_to_ticker[ticker.lower()] = ticker
+                self._company_name_to_ticker[ticker] = ticker
 
                 # Add full company name
-                self._company_name_to_ticker[name] = ticker
+                self._company_name_to_ticker[name_lower] = ticker
+
+                # Add name without Inc., Corp., etc.
+                clean_name = name_lower.replace(' inc.', '').replace(' corp.', '').replace(' co.', '').replace(' co', '').strip()
+                if clean_name != name_lower:
+                    self._company_name_to_ticker[clean_name] = ticker
 
                 # Add first word of company name
-                first_word = name.split()[0]
+                first_word = name_lower.split()[0]
                 self._company_name_to_ticker[first_word] = ticker
+
+                # Add specific keywords
+                if 'apple' in name_lower:
+                    self._company_name_to_ticker['apple'] = ticker
+                if 'microsoft' in name_lower:
+                    self._company_name_to_ticker['microsoft'] = ticker
+                if 'google' in name_lower:
+                    self._company_name_to_ticker['google'] = ticker
+                if 'meta' in name_lower:
+                    self._company_name_to_ticker['meta'] = ticker
+                if 'amazon' in name_lower:
+                    self._company_name_to_ticker['amazon'] = ticker
 
         return self._company_name_to_ticker
 
@@ -209,9 +229,32 @@ class RAGEngine:
         # If specific tickers mentioned, get their data
         if tickers:
             for ticker in tickers:
-                company_data = self._get_db().get_company_metrics(ticker)
-                if company_data:
-                    # Add ratios and profitability
+                # Get all years of financial data for trend analysis
+                company_info = self._get_db().get_company_by_ticker(ticker)
+                if company_info:
+                    company_data = {
+                        'ticker': ticker,
+                        'company_name': company_info['name'],
+                        'sector': company_info.get('sector'),
+                        'metrics': {}
+                    }
+
+                    # Get revenue trends (multiple years)
+                    trends = self._get_db().get_revenue_trend(ticker, years=3)
+                    for trend in reversed(trends):  # Reverse to get chronological order
+                        # Extract year from fiscal_year (could be date string like '2025-09-27' or just year)
+                        fiscal_year_str = str(trend['fiscal_year'])
+                        year = fiscal_year_str[:4]  # Extract first 4 chars (YYYY)
+
+                        company_data['metrics'][year] = {
+                            'revenue_billions': (trend['revenue'] / 1e9) if trend.get('revenue') else 0,
+                            'net_income_billions': (trend['net_income'] / 1e9) if trend.get('net_income') else 0,
+                            'operating_cash_flow_billions': (trend['operating_cash_flow'] / 1e9) if trend.get('operating_cash_flow') else 0,
+                            'total_assets_billions': (trend['total_assets'] / 1e9) if trend.get('total_assets') else 0,
+                            'total_liabilities_billions': (trend['total_liabilities'] / 1e9) if trend.get('total_liabilities') else 0,
+                        }
+
+                    # Add ratios and profitability (latest year)
                     ratios = self._get_db().get_ratios(ticker)
                     prof = self._get_db().get_profitability(ticker)
                     yoy = self._get_db().get_yoy_growth(ticker)
@@ -430,7 +473,9 @@ Please provide a clear, analytical response based on the financial data provided
             {type, tickers, years, metrics, title} or None
         """
         tickers = entities.get('tickers', [])
+        logger.info(f"generate_chart_config called: query={query[:50]}, tickers={tickers}, category={category}")
         if not tickers:
+            logger.warning(f"No tickers found for chart generation")
             return None
 
         # Build data summary for LLM to analyze
@@ -481,10 +526,14 @@ For comparisons between companies, include both tickers in title"""
                 )
                 config_json = response.text
 
+            logger.debug(f"LLM response (first 300 chars): {config_json[:300]}")
+
             # Parse and build the chart data
             config = json.loads(config_json.strip())
+            logger.debug(f"Parsed config: {config}")
 
             # Build actual chart data based on config
+            logger.debug(f"Building chart data: type={config.get('type')}, metrics={config.get('metrics')}, years={config.get('years')}")
             chart_data = self._build_chart_data(
                 chart_type=config.get('type', 'line'),
                 tickers=tickers,
@@ -493,18 +542,96 @@ For comparisons between companies, include both tickers in title"""
                 precise_data=precise_data
             )
 
+            logger.debug(f"chart_data returned from _build_chart_data: {chart_data is not None}, type={type(chart_data)}")
             if not chart_data:
+                logger.warning(f"chart_data is None/empty after building")
                 return None
 
-            return {
+            logger.debug(f"Chart data built successfully, data keys: {chart_data.keys() if isinstance(chart_data, dict) else 'N/A'}")
+            result = {
                 'type': config.get('type', 'line'),
                 'title': config.get('title', f'{category.title()} - {", ".join(tickers)}'),
                 'data': chart_data,
             }
+            logger.debug(f"Returning chart config with data: result={result}")
+            return result
 
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON from LLM chart config: {e}. Raw: {config_json[:200]}")
+            # Fallback: Generate simple chart config based on category
+            return self._fallback_chart_config(tickers, category, precise_data)
         except Exception as e:
-            logger.error(f"Chart config generation failed: {e}")
-            return None
+            logger.error(f"Chart config generation failed: {e}", exc_info=True)
+            # Fallback: Generate simple chart config
+            return self._fallback_chart_config(tickers, category, precise_data)
+
+    def _enhance_precise_data_from_semantic(self, precise_data: Dict, semantic_docs: List[Dict], tickers: List[str]) -> Dict:
+        """
+        Enhance precise_data with financial metrics extracted from semantic documents
+
+        Args:
+            precise_data: Base precise data from SQLite
+            semantic_docs: Semantic search results with financial data
+            tickers: Target tickers
+
+        Returns:
+            Enhanced precise_data with multi-year metrics from semantic docs
+        """
+        # Build a map of year data from semantic docs
+        year_data_map = {}  # {ticker: {year: {metrics}}}
+
+        for doc in semantic_docs:
+            metadata = doc.get('metadata', {})
+            ticker = metadata.get('ticker')
+            if ticker not in tickers:
+                continue
+
+            # Extract financial metrics from document content
+            content = doc.get('document', '')
+
+            # Try to extract fiscal year from metadata
+            fiscal_year_str = metadata.get('fiscal_year', '')
+            if fiscal_year_str:
+                # Extract year (e.g., '2025-09-27' -> '2025' or '2025' -> '2025')
+                year = fiscal_year_str[:4]
+            else:
+                continue
+
+            # Extract revenue, net income, total assets from content
+            import re
+            revenue_match = re.search(r'Total Revenue.*?\$?\s*([\d.]+)\s*B', content)
+            net_income_match = re.search(r'Net Income.*?\$?\s*([\d.]+)\s*B', content)
+            total_assets_match = re.search(r'Total Assets.*?\$?\s*([\d.]+)\s*B', content)
+
+            if not year_data_map.get(ticker):
+                year_data_map[ticker] = {}
+
+            year_metrics = {}
+            if revenue_match:
+                year_metrics['revenue_billions'] = float(revenue_match.group(1))
+            if net_income_match:
+                year_metrics['net_income_billions'] = float(net_income_match.group(1))
+            if total_assets_match:
+                year_metrics['total_assets_billions'] = float(total_assets_match.group(1))
+
+            if year_metrics:
+                year_data_map[ticker][year] = year_metrics
+
+        # Merge semantic data into precise_data
+        for company_data in precise_data.get('companies_data', []):
+            ticker = company_data.get('ticker')
+            if ticker in year_data_map:
+                # Merge years (semantic data might have more years)
+                if 'metrics' not in company_data:
+                    company_data['metrics'] = {}
+                for year, metrics in year_data_map[ticker].items():
+                    if year not in company_data['metrics']:
+                        company_data['metrics'][year] = metrics
+                    else:
+                        # Enhance with additional metrics from semantic docs
+                        company_data['metrics'][year].update(metrics)
+
+        return precise_data
 
     def _build_chart_data_summary(self, tickers: List[str], precise_data: Dict) -> str:
         """Build a summary of available data for the LLM"""
@@ -546,22 +673,29 @@ For comparisons between companies, include both tickers in title"""
             'operating_margin': '#ec4899',
         }
 
+        logger.debug(f"_build_line_chart: tickers={tickers}, metrics={metrics}, years={years}")
+        logger.debug(f"_build_line_chart: companies_data count={len(precise_data.get('companies_data', []))}")
+
         for ticker in tickers:
             company_data = next((c for c in precise_data.get('companies_data', []) if c['ticker'] == ticker), None)
             if not company_data:
+                logger.debug(f"No company data found for {ticker}")
                 continue
 
             metrics_data = company_data.get('metrics', {})
+            logger.debug(f"Company {ticker} has metrics for years: {list(metrics_data.keys())}")
 
             for i, year in enumerate(years):
                 year_str = str(year)
                 if year_str not in metrics_data:
+                    logger.debug(f"Year {year_str} not in metrics for {ticker}")
                     continue
 
                 if i >= len(chart_data):
                     chart_data.append({'name': year})
 
                 year_metrics = metrics_data[year_str]
+                logger.debug(f"Year {year_str} metrics: {year_metrics}")
 
                 for metric in metrics:
                     metric_key = metric.lower().replace(' ', '_')
@@ -574,6 +708,9 @@ For comparisons between companies, include both tickers in title"""
 
                     label = f"{ticker} {metric}"
                     chart_data[i][label] = value
+                    logger.debug(f"Set {label} = {value}")
+
+        logger.debug(f"chart_data after loop: {chart_data}")
 
         # Add datasets
         seen_labels = set()
@@ -592,10 +729,12 @@ For comparisons between companies, include both tickers in title"""
                         'fill': True,
                     })
 
-        return {
+        result = {
             'labels': [str(d['name']) for d in chart_data],
             'datasets': datasets,
         }
+        logger.debug(f"_build_line_chart returning: {result}")
+        return result
 
     def _build_bar_chart(self, tickers: List[str], metrics: List[str], years: List[int], precise_data: Dict) -> Dict:
         """Build bar chart for comparisons"""
@@ -625,6 +764,49 @@ For comparisons between companies, include both tickers in title"""
                 'backgroundColor': '#6366f1',
             }]
         }
+
+    def _fallback_chart_config(self, tickers: List[str], category: str, precise_data: Dict) -> Dict:
+        """Fallback chart generation if LLM fails"""
+        try:
+            # Determine years from data
+            years = set()
+            for company in precise_data.get('companies_data', []):
+                if company['ticker'] in tickers:
+                    metrics_data = company.get('metrics', {})
+                    years.update(int(y) for y in metrics_data.keys() if y.isdigit())
+
+            years = sorted(list(years))[-3:] if years else [2023, 2024, 2025]  # Last 3 years
+
+            # Simple chart based on category
+            if category == 'revenue' or 'revenue' in category.lower():
+                chart_type = 'line'
+                metrics = ['revenue', 'net_income']
+            elif category == 'profitability' or 'margin' in category.lower():
+                chart_type = 'bar'
+                metrics = ['profit_margin']
+            else:
+                chart_type = 'bar'
+                metrics = ['revenue']
+
+            chart_data = self._build_chart_data(
+                chart_type=chart_type,
+                tickers=tickers,
+                metrics=metrics,
+                years=years,
+                precise_data=precise_data
+            )
+
+            if not chart_data:
+                return None
+
+            return {
+                'type': chart_type,
+                'title': f'{category.title()} Trend - {", ".join(tickers)} ({min(years)}-{max(years)})',
+                'data': chart_data,
+            }
+        except Exception as e:
+            logger.error(f"Fallback chart generation failed: {e}")
+            return None
 
     def _build_radar_chart(self, tickers: List[str], metrics: List[str], precise_data: Dict) -> Dict:
         """Build radar chart for ratios/metrics"""
@@ -723,16 +905,27 @@ For comparisons between companies, include both tickers in title"""
 
         # Determine chart config (LLM-generated)
         category = entities.get('category')
+        tickers = entities.get('tickers', [])
         chart_config = None
 
+        logger.debug(f"Chart generation: category={category}, tickers={tickers}")
+
         # Only generate chart if we have tickers and a category
-        if category and entities.get('tickers'):
+        if category and tickers:
+            logger.debug(f"Generating chart config for {tickers}")
+            # Enhance precise_data with semantic doc metadata for multi-year data
+            enhanced_precise_data = self._enhance_precise_data_from_semantic(
+                precise_data, semantic_docs, tickers
+            )
             chart_config = self.generate_chart_config(
                 query=query,
                 category=category,
                 entities=entities,
-                precise_data=precise_data
+                precise_data=enhanced_precise_data
             )
+            logger.debug(f"Chart config generated: {bool(chart_config)}")
+        else:
+            logger.debug(f"Skipping chart: category={bool(category)}, tickers={bool(tickers)}")
 
         return {
             'response': response_text,

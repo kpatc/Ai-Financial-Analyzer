@@ -130,7 +130,7 @@ Entreprises disponibles: MSFT, AAPL, GOOGL, AMZN, TSLA, META, NVDA, AMD, INTC, J
 # LOGGING CONFIGURATION
 # ============================================================================
 LOGGING_CONFIG = {
-    'level': 'INFO',
+    'level': 'DEBUG',
     'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     'log_file': 'chatbot.log',
 }
