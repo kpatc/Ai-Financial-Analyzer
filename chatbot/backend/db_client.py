@@ -397,11 +397,21 @@ class FinancialDBClient:
 
                 # Ratios (always include basic ones)
                 if ratios:
-                    comparison_item['debt_to_equity'] = round(ratios.get('debt_to_equity', 0), 2)
-                    comparison_item['roa_pct'] = round(ratios.get('roa_pct', 0), 2)
-                    comparison_item['roe_pct'] = round(ratios.get('roe_pct', 0), 2)
-                    comparison_item['asset_turnover'] = round(ratios.get('asset_turnover', 0), 2)
-                    comparison_item['free_cash_flow'] = round(ratios.get('free_cash_flow', 0) / 1e9, 2) if ratios.get('free_cash_flow') else None
+                    dte = ratios.get('debt_to_equity')
+                    if dte is not None:
+                        comparison_item['debt_to_equity'] = round(dte, 2)
+                    roa = ratios.get('roa_pct')
+                    if roa is not None:
+                        comparison_item['roa_pct'] = round(roa, 2)
+                    roe = ratios.get('roe_pct')
+                    if roe is not None:
+                        comparison_item['roe_pct'] = round(roe, 2)
+                    at = ratios.get('asset_turnover')
+                    if at is not None:
+                        comparison_item['asset_turnover'] = round(at, 2)
+                    fcf = ratios.get('free_cash_flow')
+                    if fcf is not None:
+                        comparison_item['free_cash_flow'] = round(fcf / 1e9, 2)
 
                 if include_all_ratios:
                     # Liquidity

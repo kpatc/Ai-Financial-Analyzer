@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Financial Chatbot REST API
-Flask API with RAG engine, semantic search, chart generation, and conversation history
+Flask API with LangChain RAG engine, conversation memory, and semantic search
 """
 
 import logging
@@ -14,7 +14,7 @@ from flask_cors import CORS
 
 import os
 from config import FLASK_CONFIG, SECURITY_CONFIG, CHART_TYPES, SQLITE_CONFIG, LOGGING_CONFIG
-from rag_engine import RAGEngine
+from rag_engine import RAGEngine, ConversationBufferMemory
 from db_client import FinancialDBClient
 from vector_sync import ensure_vector_db_synced
 
@@ -41,7 +41,25 @@ app.config['MAX_CONTENT_LENGTH'] = FLASK_CONFIG['max_content_length']
 
 # Global instances
 _rag_engine = None
-_conversation_histories = {}  # Track per-session conversations
+_session_memories = {}  # Track per-session ConversationBufferMemory
+
+
+def get_or_create_memory(session_id: str) -> ConversationBufferMemory:
+    """
+    Get or create a ConversationBufferMemory for a session
+
+    Args:
+        session_id: Session identifier
+
+    Returns:
+        ConversationBufferMemory object
+    """
+    if session_id not in _session_memories:
+        _session_memories[session_id] = ConversationBufferMemory(
+            memory_key="history",
+            return_messages=True
+        )
+    return _session_memories[session_id]
 
 
 # ============================================================================
@@ -317,7 +335,7 @@ def health():
 @app.route('/api/chat', methods=['POST'])
 def chat():
     """
-    Main chat endpoint
+    Main chat endpoint with LangChain memory support
     POST body: {message, session_id (optional)}
     """
     try:
@@ -334,20 +352,16 @@ def chat():
 
         session_id = data.get('session_id', 'default')
 
-        # Get conversation history for this session
-        history = _conversation_histories.get(session_id, [])
+        # Get or create conversation memory for this session
+        memory = get_or_create_memory(session_id)
 
-        # Process query through RAG engine
-        rag_result = _rag_engine.process(message, history=history)
+        # Process query through RAG engine with memory support
+        rag_result = _rag_engine.process(message, memory=memory)
 
-        # Update history
-        history.append({'role': 'user', 'content': message})
-        history.append({'role': 'assistant', 'content': rag_result['response']})
-
-        # Keep only last N messages
-        max_history = SECURITY_CONFIG.get('max_history_messages', 10)
-        history = history[-max_history:]
-        _conversation_histories[session_id] = history
+        # Manually add to memory (LangChain's ConversationChain does this automatically,
+        # but we do it here for clarity and to support greeting/off-topic responses)
+        memory.chat_memory.add_user_message(message)
+        memory.chat_memory.add_ai_message(rag_result['response'])
 
         # Extract all response components
         chart_data = rag_result.get('chart')
@@ -435,15 +449,15 @@ def get_comparison():
 
 @app.route('/api/chat/reset', methods=['POST'])
 def reset_chat():
-    """Reset conversation history"""
+    """Reset conversation memory for a session"""
     try:
         session_id = request.get_json().get('session_id', 'default') if request.get_json() else 'default'
 
-        if session_id in _conversation_histories:
-            del _conversation_histories[session_id]
+        if session_id in _session_memories:
+            _session_memories[session_id].clear()
 
         return jsonify({
-            'message': 'Conversation history reset',
+            'message': 'Conversation memory reset',
             'session_id': session_id
         }), 200
 

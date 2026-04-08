@@ -8,3 +8,8 @@ transformers==4.35.0
 python-dotenv==1.0.0
 requests==2.31.0
 google-generativeai>=0.3.0
+groq>=0.4.0
+langchain>=0.2.0
+langchain-groq>=0.1.0
+langchain-google-genai>=1.0.0
+langchain-core>=0.2.0

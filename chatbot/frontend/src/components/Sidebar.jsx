@@ -23,7 +23,7 @@ export default function Sidebar({ companies, onCompanySelect, onQuickAction }) {
   ];
 
   return (
-    <div className="w-64 bg-dark-bg-secondary flex flex-col border-r border-dark-border h-screen">
+    <div className="w-64 bg-dark-bg-secondary flex flex-col border-r border-dark-border">
       
       {/* QUICK ACTIONS - Top Section */}
       <div className="p-4 border-b border-dark-border">

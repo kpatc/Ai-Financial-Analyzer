@@ -21,7 +21,7 @@ export default function ChatArea({ messages, isLoading, onSendMessage, onResetCh
   return (
     <div className="flex-1 flex flex-col bg-dark-bg">
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
+      <div className="flex-1 overflow-y-scroll px-6 py-6 space-y-4 min-h-0">
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center max-w-md">

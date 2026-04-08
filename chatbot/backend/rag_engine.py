@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-RAG Engine - Retrieval Augmented Generation
-Hybrid approach: ChromaDB semantic search + SQLite precise queries + LLM (Gemini or Groq)
+RAG Engine - Retrieval Augmented Generation with LangChain
+Hybrid approach: ChromaDB semantic search + SQLite precise queries + LangChain LLM (Gemini or Groq)
 """
 
 import re
@@ -9,8 +9,33 @@ import json
 import logging
 from typing import List, Dict, Any, Optional, Tuple
 
-import google.generativeai as genai
-from groq import Groq
+from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+
+
+class ConversationBufferMemory:
+    """Simple conversation memory implementation for storing message history"""
+    def __init__(self, memory_key="history", return_messages=True):
+        self.memory_key = memory_key
+        self.return_messages = return_messages
+
+        class ChatMemory:
+            def __init__(self):
+                self.messages = []
+
+            def add_user_message(self, msg):
+                self.messages.append(HumanMessage(content=msg))
+
+            def add_ai_message(self, msg):
+                self.messages.append(AIMessage(content=msg))
+
+        self.chat_memory = ChatMemory()
+
+    def clear(self):
+        self.chat_memory.messages = []
 
 from config import GEMINI_CONFIG, GROQ_CONFIG, LLM_PROVIDER, QUERY_CATEGORIES, SYSTEM_PROMPT, SQLITE_CONFIG, CHROMA_CONFIG
 from db_client import FinancialDBClient
@@ -28,7 +53,7 @@ class RAGEngine:
 
     def __init__(self, db_path: str = None, chroma_path: str = None):
         """
-        Initialize RAG engine
+        Initialize RAG engine with LangChain
 
         Args:
             db_path: Path to SQLite database
@@ -41,17 +66,31 @@ class RAGEngine:
         if self.llm_provider == 'groq':
             if not GROQ_CONFIG.get('api_key'):
                 raise ValueError("GROQ_API_KEY environment variable not set")
-            self.groq_client = Groq(api_key=GROQ_CONFIG['api_key'])
-            self.model = None
+            self.llm = ChatGroq(
+                api_key=GROQ_CONFIG['api_key'],
+                model=GROQ_CONFIG.get('model', 'llama-3.3-70b-versatile'),
+                temperature=GROQ_CONFIG.get('temperature', 0.7),
+                max_tokens=GROQ_CONFIG.get('max_tokens', 1024),
+            )
         else:  # gemini (default)
             if not GEMINI_CONFIG.get('api_key'):
                 raise ValueError("GEMINI_API_KEY environment variable not set")
-            genai.configure(api_key=GEMINI_CONFIG['api_key'])
-            self.model = genai.GenerativeModel(
-                model_name=GEMINI_CONFIG['model'],
-                system_instruction=SYSTEM_PROMPT
+            self.llm = ChatGoogleGenerativeAI(
+                api_key=GEMINI_CONFIG['api_key'],
+                model=GEMINI_CONFIG.get('model', 'gemini-2.0-flash'),
+                temperature=GEMINI_CONFIG.get('temperature', 0.7),
             )
-            self.groq_client = None
+
+        # Initialize guardrail chain for greetings/off-topic detection
+        guardrail_prompt = PromptTemplate(
+            input_variables=['query'],
+            template="""Classify this user input as one of: GREETING | FINANCIAL | OFF_TOPIC
+
+Input: {query}
+
+Answer ONLY with the label (GREETING, FINANCIAL, or OFF_TOPIC), no explanation."""
+        )
+        self.guardrail_chain = guardrail_prompt | self.llm | StrOutputParser()
 
         # Initialize databases
         self.db_path = db_path or SQLITE_CONFIG['path']
@@ -64,7 +103,7 @@ class RAGEngine:
         self._tickers_cache = None
         self._company_name_to_ticker = None
 
-        logger.info("RAG engine initialized")
+        logger.info("RAG engine initialized with LangChain")
 
     def _get_db(self):
         """Get a fresh database connection for the current thread"""
@@ -381,23 +420,56 @@ class RAGEngine:
     # LLM GENERATION
     # ========================================================================
 
-    def generate(self, query: str, context: str, history: List[Dict] = None) -> str:
+    def generate(self, query: str, context: str, memory: ConversationBufferMemory = None) -> str:
         """
-        Generate response using LLM (Gemini or Groq)
+        Generate response using LangChain
 
         Args:
             query: User question
             context: RAG context
-            history: Conversation history
+            memory: ConversationBufferMemory for conversation history
 
         Returns:
             LLM response text
         """
-        # Build the prompt
-        full_prompt = f"""{SYSTEM_PROMPT}
+        return self._generate_with_memory(query, context, memory)
 
-CONTEXT:
-{context}
+    def _check_guardrail(self, query: str) -> str:
+        """
+        Check if query is a greeting or off-topic using guardrail chain.
+        Returns: 'GREETING' | 'FINANCIAL' | 'OFF_TOPIC'
+        """
+        try:
+            result = self.guardrail_chain.invoke({'query': query})
+            classification = result.strip().upper()
+            logger.debug(f"Guardrail classification: {classification}")
+            return classification
+        except Exception as e:
+            logger.warning(f"Guardrail check failed: {e}, assuming FINANCIAL")
+            return 'FINANCIAL'
+
+    def _get_greeting_response(self) -> str:
+        """Generate a friendly greeting response"""
+        return "Bonjour! Je suis FinanceAI, votre analyste financier. Je peux vous aider à analyser les données financières de 34 grandes entreprises (Apple, Microsoft, Cisco, Google, Tesla, Amazon, Meta, NVIDIA, JPMorgan, Bank of America, Coca-Cola, etc.). Posez-moi une question sur les revenus, la profitabilité, les tendances ou des comparaisons entre entreprises!"
+
+    def _get_offtopic_response(self) -> str:
+        """Generate an off-topic redirect response"""
+        return "Je suis spécialisé en analyse financière. Je ne peux pas répondre à votre question. Essayez plutôt: 'Quels sont les revenus d'Apple?', 'Comparez les marges de profit Microsoft vs Google', ou 'Analysez la situation de la dette chez Cisco'."
+
+    def _generate_with_memory(self, query: str, context: str, memory: ConversationBufferMemory = None) -> str:
+        """
+        Generate response using LangChain with memory support
+
+        Args:
+            query: User question
+            context: Financial context (retrieved data)
+            memory: ConversationBufferMemory object
+
+        Returns:
+            LLM response text
+        """
+        # Build the augmented input with context
+        augmented_input = f"""{context}
 
 USER QUESTION:
 {query}
@@ -405,69 +477,26 @@ USER QUESTION:
 Please provide a clear, analytical response based on the financial data provided above."""
 
         try:
-            if self.llm_provider == 'groq':
-                return self._generate_groq(full_prompt, history)
-            else:
-                return self._generate_gemini(full_prompt, history)
+            # Build messages for the LLM
+            messages = [SystemMessage(content=SYSTEM_PROMPT)]
+
+            # Add conversation history from memory if available
+            if memory and hasattr(memory, 'chat_memory'):
+                messages.extend(memory.chat_memory.messages)
+
+            # Add current query
+            messages.append(HumanMessage(content=augmented_input))
+
+            # Call LLM
+            response = self.llm.invoke(messages)
+            response_text = response.content if hasattr(response, 'content') else str(response)
+
+            logger.debug(f"Generated response ({len(response_text)} chars)")
+            return response_text
+
         except Exception as e:
-            logger.error(f"LLM generation failed: {e}")
+            logger.error(f"LLM generation failed: {e}", exc_info=True)
             return f"Error generating response: {str(e)}"
-
-    def _generate_gemini(self, prompt: str, history: List[Dict] = None) -> str:
-        """Generate response using Gemini"""
-        messages = []
-
-        # Add recent history
-        if history:
-            for msg in history[-3:]:
-                messages.append({
-                    'role': 'user' if msg.get('role') == 'user' else 'model',
-                    'parts': [msg.get('content', '')]
-                })
-
-        messages.append({'role': 'user', 'parts': [prompt]})
-
-        response = self.model.generate_content(
-            messages,
-            generation_config=genai.types.GenerationConfig(
-                temperature=GEMINI_CONFIG.get('temperature', 0.7),
-                max_output_tokens=GEMINI_CONFIG.get('max_output_tokens', 1000),
-                top_p=GEMINI_CONFIG.get('top_p', 0.95),
-            )
-        )
-
-        text = response.text if response else "Unable to generate response"
-        logger.debug(f"Generated response ({len(text)} chars)")
-        return text
-
-    def _generate_groq(self, prompt: str, history: List[Dict] = None) -> str:
-        """Generate response using Groq"""
-        messages = []
-
-        # Add system message
-        messages.append({'role': 'system', 'content': SYSTEM_PROMPT})
-
-        # Add recent history
-        if history:
-            for msg in history[-3:]:
-                messages.append({
-                    'role': msg.get('role', 'user'),
-                    'content': msg.get('content', '')
-                })
-
-        # Add current prompt
-        messages.append({'role': 'user', 'content': prompt})
-
-        response = self.groq_client.chat.completions.create(
-            model=GROQ_CONFIG.get('model', 'mixtral-8x7b-32768'),
-            messages=messages,
-            temperature=GROQ_CONFIG.get('temperature', 0.7),
-            max_tokens=GROQ_CONFIG.get('max_tokens', 1000),
-        )
-
-        text = response.choices[0].message.content if response.choices else "Unable to generate response"
-        logger.debug(f"Generated response ({len(text)} chars)")
-        return text
 
     # ========================================================================
     # CHART GENERATION
@@ -519,26 +548,18 @@ For trend analysis, include ALL years: [2023, 2024, 2025]
 For comparisons between companies, include both tickers in title"""
 
         try:
-            if self.llm_provider == 'groq':
-                response = self.groq_client.chat.completions.create(
-                    model=GROQ_CONFIG.get('model', 'llama-3.3-70b-versatile'),
-                    messages=[
-                        {'role': 'system', 'content': 'You are a financial data visualization expert. Generate precise chart configs as JSON.'},
-                        {'role': 'user', 'content': chart_prompt}
-                    ],
-                    temperature=0.3,  # Low temp for structured output
-                    max_tokens=500,
-                )
-                config_json = response.choices[0].message.content
-            else:
-                response = self.model.generate_content(
-                    chart_prompt,
-                    generation_config=genai.types.GenerationConfig(
-                        temperature=0.3,
-                        max_output_tokens=500,
-                    )
-                )
-                config_json = response.text
+            # Use LangChain LLM for chart config generation
+            chart_template = PromptTemplate(
+                input_variables=['chart_prompt'],
+                template="""You are a financial data visualization expert. Generate precise chart configs as JSON.
+
+{chart_prompt}
+
+Respond ONLY with valid JSON."""
+            )
+
+            chain = chart_template | self.llm | StrOutputParser()
+            config_json = chain.invoke({'chart_prompt': chart_prompt})
 
             logger.debug(f"LLM response (first 300 chars): {config_json[:300]}")
 
@@ -855,14 +876,15 @@ For comparisons between companies, include both tickers in title"""
     def process(
         self,
         query: str,
-        history: List[Dict] = None
+        memory: ConversationBufferMemory = None
     ) -> Dict[str, Any]:
         """
-        Complete RAG pipeline: detect entities → retrieve → generate
+        Complete RAG pipeline with guardrail:
+        - Check guardrail (greeting/off-topic) → retrieve → generate
 
         Args:
             query: User question
-            history: Conversation history
+            memory: ConversationBufferMemory for conversation history
 
         Returns:
             {response, sources, category, chart, table}
@@ -877,6 +899,31 @@ For comparisons between companies, include both tickers in title"""
                 'entities': {}
             }
 
+        # Step 1: Check guardrail for greetings and off-topic
+        guardrail_result = self._check_guardrail(query)
+        logger.info(f"Guardrail check: {guardrail_result}")
+
+        if guardrail_result == 'GREETING':
+            return {
+                'response': self._get_greeting_response(),
+                'sources': [],
+                'category': 'greeting',
+                'chart': None,
+                'table': None,
+                'entities': {}
+            }
+
+        if guardrail_result == 'OFF_TOPIC':
+            return {
+                'response': self._get_offtopic_response(),
+                'sources': [],
+                'category': 'off_topic',
+                'chart': None,
+                'table': None,
+                'entities': {}
+            }
+
+        # Step 2: Proceed with normal RAG pipeline for FINANCIAL queries
         # Detect entities
         entities = self.detect_entities(query)
         logger.debug(f"Detected entities: {entities}")
@@ -888,8 +935,8 @@ For comparisons between companies, include both tickers in title"""
         # Build context with company names
         context = self.build_context(semantic_docs, precise_data, entities)
 
-        # Generate response
-        response_text = self.generate(query, context, history)
+        # Generate response with memory support
+        response_text = self.generate(query, context, memory)
 
         # Shorten response if not requesting details
         from smart_response import should_give_details, shorten_response
@@ -970,7 +1017,6 @@ For comparisons between companies, include both tickers in title"""
 
                         # Get all metrics for past 3 years
                         revenue_trend = self._get_db().get_revenue_trend(ticker, years=3)
-                        growth = self._get_db().get_growth_metrics(ticker, years=3)
 
                         if revenue_trend:
                             metrics_dict = {}
