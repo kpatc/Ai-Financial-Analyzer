@@ -17,7 +17,9 @@ A comprehensive financial analysis platform built during the **BCG GenAI Job Sim
 -  SEC EDGAR Data Extraction — Automatically extract financial data from 10-K and 10-Q filings for 33+ companies
 -  Advanced Financial Analysis — Calculate 30+ financial metrics and ratios including liquidity, profitability, leverage, and efficiency ratios
 -  Historical Metrics & Growth Trends — 3-year CAGR calculations and year-over-year analysis
-- AI-Powered Chatbot — Natural language interface for financial queries with intelligent response formatting
+- AI-Powered Chatbot with LangChain — Natural language interface with intelligent conversation memory, topic guardrails, and context-aware responses
+-  Conversation Memory — LangChain-powered session memory to remember previous questions in the same session
+-  Smart Query Classification — Automatically detect greetings, off-topic queries, and financial questions with targeted responses
 -  Interactive Visualizations — Dynamic charts and tables for data exploration
 -  Semantic Search — Vector-based search using Sentence-Transformers for contextual queries
 -  Production-Ready API — Flask REST API with comprehensive endpoints for data retrieval and analysis
@@ -77,8 +79,10 @@ SEC EDGAR 10-K/10-Q Filings
     │  (Semantic Search Index)    │
     └────────┬────────────────────┘
              │
-    [Chatbot Backend - Flask API]
-    ├─ Query Classification (Groq LLM)
+    [Chatbot Backend - Flask API + LangChain]
+    ├─ Guardrail Chain (Greeting/Off-Topic Detection)
+    ├─ Conversation Memory (Session-based)
+    ├─ Query Classification (Groq LLM via LangChain)
     ├─ Semantic Search Engine
     ├─ Response Formatting
     └─ Chart/Table Generation
@@ -211,9 +215,15 @@ Generates analysis CSVs in `data/analysis/`:
 
 ---
 
-### 3. Interactive Chatbot
+### 3. Interactive Chatbot (LangChain-Powered)
 
-Natural language interface powered by **Groq LLM** with intelligent response formatting:
+Natural language interface powered by **LangChain** with **Groq LLM** (or Google Generative AI) backend:
+
+**Agent Capabilities:**
+- **Conversation Memory** — Remembers previous questions within a session
+- **Intelligent Guardrails** — Automatically detects and responds to greetings, redirects off-topic queries
+- **Context-Aware Responses** — Maintains conversation history for coherent multi-turn interactions
+- **Query Classification** — Categorizes financial questions for targeted analysis
 
 **Query Types Supported:**
 - Revenue trends and analysis
@@ -230,11 +240,14 @@ Natural language interface powered by **Groq LLM** with intelligent response for
 - Dynamic chart generation for trends
 - Data tables for metric comparisons
 - Source citations and data references
+- Friendly greetings with context on available analyses
 
 **Example Queries:**
+- "Hello!" → Friendly greeting with info on available analyses
 - "What is Apple's revenue trend?"
 - "Compare Microsoft vs Google profitability"
 - "Show liquidity ratios for tech companies"
+- "What did I ask first?" → Recalls conversation history
 - "Explain Tesla's debt situation"
 
 
@@ -246,9 +259,10 @@ Natural language interface powered by **Groq LLM** with intelligent response for
 - **Python 3.9+** — Core programming language
 - **Flask** — REST API framework
 - **SQLAlchemy** — ORM for database operations
+- **LangChain** — AI agent framework for conversation memory, guardrails, and LLM orchestration
 - **ChromaDB** — Vector database for semantic search
 - **Sentence-Transformers** — Embedding model (all-MiniLM-L6-v2)
-- **Groq API** — LLM for query analysis and response generation
+- **Groq API** / **Google Generative AI** — LLM providers for query analysis and response generation
 - **edgartools** — SEC EDGAR API client
 - **Pandas** — Data manipulation and analysis
 
